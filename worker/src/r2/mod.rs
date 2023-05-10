@@ -3,6 +3,7 @@ use std::{collections::HashMap, convert::TryInto};
 pub use builder::*;
 
 use js_sys::{JsString, Reflect, Uint8Array};
+use serde::{Serialize, Deserialize, Serializer, ser::SerializeStruct};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use worker_sys::{
@@ -299,17 +300,39 @@ impl<'body> ObjectBody<'body> {
 /// [UploadedPart] represents a part that has been uploaded.
 /// [UploadedPart] objects are returned from [upload_part](MultipartUpload::upload_part) operations
 /// and must be passed to the [complete](MultipartUpload::complete) operation.
+#[derive(Deserialize)]
 pub struct UploadedPart {
-    inner: EdgeR2UploadedPart,
+    #[serde(skip)]
+    inner: Option<EdgeR2UploadedPart>,
+    part_number: Option<u16>,
+    etag: Option<String>,
 }
 
 impl UploadedPart {
     pub fn part_number(&self) -> u16 {
-        self.inner.part_number()
+        match &self.inner {
+            Some(inner) => inner.part_number(),
+            None => self.part_number.unwrap()
+        }
     }
 
     pub fn etag(&self) -> String {
-        self.inner.etag()
+        match &self.inner {
+            Some(inner) => inner.etag(),
+            None => self.etag.clone().unwrap()
+        }
+    }
+}
+
+impl Serialize for UploadedPart {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("UploadedPart", 2)?;
+        state.serialize_field("part_number", &self.part_number())?;
+        state.serialize_field("etag", &self.etag())?;
+        state.end()
     }
 }
 
@@ -318,6 +341,16 @@ pub struct MultipartUpload {
 }
 
 impl MultipartUpload {
+    /// The key for the multipart upload.
+    pub fn key(&self) -> String {
+        self.inner.key()
+    }
+
+    /// The `uploadId` for the multipart upload.
+    pub fn upload_id(&self) -> String {
+        self.inner.upload_id()
+    }
+
     /// Uploads a single part with the specified part number to this multipart upload.
     ///
     /// Returns an [UploadedPart] object containing the etag and part number.
@@ -338,7 +371,9 @@ impl MultipartUpload {
         let uploaded_part =
             JsFuture::from(self.inner.upload_part(part_number, value.into().into())).await?;
         Ok(UploadedPart {
-            inner: uploaded_part.into(),
+            inner: Some(uploaded_part.into()),
+            part_number: None,
+            etag: None
         })
     }
 
