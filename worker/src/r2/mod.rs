@@ -300,40 +300,10 @@ impl<'body> ObjectBody<'body> {
 /// [UploadedPart] represents a part that has been uploaded.
 /// [UploadedPart] objects are returned from [upload_part](MultipartUpload::upload_part) operations
 /// and must be passed to the [complete](MultipartUpload::complete) operation.
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct UploadedPart {
-    #[serde(skip)]
-    inner: Option<EdgeR2UploadedPart>,
-    part_number: Option<u16>,
-    etag: Option<String>,
-}
-
-impl UploadedPart {
-    pub fn part_number(&self) -> u16 {
-        match &self.inner {
-            Some(inner) => inner.part_number(),
-            None => self.part_number.unwrap()
-        }
-    }
-
-    pub fn etag(&self) -> String {
-        match &self.inner {
-            Some(inner) => inner.etag(),
-            None => self.etag.clone().unwrap()
-        }
-    }
-}
-
-impl Serialize for UploadedPart {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("UploadedPart", 2)?;
-        state.serialize_field("part_number", &self.part_number())?;
-        state.serialize_field("etag", &self.etag())?;
-        state.end()
-    }
+    part_number: u16,
+    etag: String,
 }
 
 pub struct MultipartUpload {
@@ -368,12 +338,11 @@ impl MultipartUpload {
         part_number: u16,
         value: impl Into<Data>,
     ) -> Result<UploadedPart> {
-        let uploaded_part =
-            JsFuture::from(self.inner.upload_part(part_number, value.into().into())).await?;
+        let uploaded_part: EdgeR2UploadedPart =
+            JsFuture::from(self.inner.upload_part(part_number, value.into().into())).await?.into();
         Ok(UploadedPart {
-            inner: Some(uploaded_part.into()),
-            part_number: None,
-            etag: None
+            part_number: uploaded_part.part_number(),
+            etag: uploaded_part.etag()
         })
     }
 
