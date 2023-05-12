@@ -3,7 +3,7 @@ use std::{collections::HashMap, convert::TryInto};
 pub use builder::*;
 
 use js_sys::{JsString, Reflect, Uint8Array};
-use serde::{Deserialize};
+use serde::{Serialize, Deserialize};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use worker_sys::{
@@ -300,7 +300,7 @@ impl<'body> ObjectBody<'body> {
 /// [UploadedPart] represents a part that has been uploaded.
 /// [UploadedPart] objects are returned from [upload_part](MultipartUpload::upload_part) operations
 /// and must be passed to the [complete](MultipartUpload::complete) operation.
-#[derive(Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct UploadedPart {
     pub part_number: u16,
     pub etag: String,
