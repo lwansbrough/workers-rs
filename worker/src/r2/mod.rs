@@ -3,7 +3,7 @@ use std::{collections::HashMap, convert::TryInto};
 pub use builder::*;
 
 use js_sys::{JsString, Reflect, Uint8Array};
-use serde::{Serialize, Deserialize, Serializer, ser::SerializeStruct};
+use serde::{Deserialize};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use worker_sys::{
@@ -302,8 +302,17 @@ impl<'body> ObjectBody<'body> {
 /// and must be passed to the [complete](MultipartUpload::complete) operation.
 #[derive(Deserialize, Clone)]
 pub struct UploadedPart {
-    part_number: u16,
-    etag: String,
+    pub part_number: u16,
+    pub etag: String,
+}
+
+impl From<UploadedPart> for JsValue {
+    fn from(part: UploadedPart) -> Self {
+        let obj = js_sys::Object::new();
+        let _ = Reflect::set(&obj, &JsValue::from_str("part_number"), &JsValue::from_f64(part.part_number as f64));
+        let _ = Reflect::set(&obj, &JsValue::from_str("etag"), &JsValue::from_str(&part.etag));
+        obj.into()
+    }
 }
 
 pub struct MultipartUpload {
@@ -362,7 +371,7 @@ impl MultipartUpload {
             self.inner.complete(
                 uploaded_parts
                     .into_iter()
-                    .map(|part| part.inner.into())
+                    .map(|part| part.into())
                     .collect(),
             ),
         )
