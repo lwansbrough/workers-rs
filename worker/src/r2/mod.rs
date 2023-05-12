@@ -309,7 +309,7 @@ pub struct UploadedPart {
 impl From<UploadedPart> for JsValue {
     fn from(part: UploadedPart) -> Self {
         let obj = js_sys::Object::new();
-        let _ = Reflect::set(&obj, &JsValue::from_str("part_number"), &JsValue::from_f64(part.part_number as f64));
+        let _ = Reflect::set(&obj, &JsValue::from_str("partNumber"), &JsValue::from_f64(part.part_number as f64));
         let _ = Reflect::set(&obj, &JsValue::from_str("etag"), &JsValue::from_str(&part.etag));
         obj.into()
     }
