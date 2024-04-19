@@ -370,8 +370,8 @@ impl MultipartUpload {
         let uploaded_part: EdgeR2UploadedPart =
             JsFuture::from(self.inner.upload_part(part_number, value.into().into())).await?.into();
         Ok(UploadedPart {
-            part_number: uploaded_part.part_number(),
-            etag: uploaded_part.etag()
+            part_number: uploaded_part.part_number().unwrap(),
+            etag: uploaded_part.etag().unwrap()
         })
     }
 
