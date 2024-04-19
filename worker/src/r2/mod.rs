@@ -350,11 +350,6 @@ impl MultipartUpload {
         self.inner.key()
     }
 
-    /// The `uploadId` for the multipart upload.
-    pub fn upload_id(&self) -> String {
-        self.inner.upload_id()
-    }
-
     /// Uploads a single part with the specified part number to this multipart upload.
     ///
     /// Returns an [UploadedPart] object containing the etag and part number.
