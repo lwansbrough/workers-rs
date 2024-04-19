@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, punctuated::Punctuated, token::Comma, Ident, ItemFn};
 
-pub fn expand_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn expand_macro(attr: TokenStream, item: TokenStream, http: bool) -> TokenStream {
     let attrs: Punctuated<Ident, Comma> =
         parse_macro_input!(attr with Punctuated::parse_terminated);
 
@@ -50,15 +50,25 @@ pub fn expand_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
             // rename the original attributed fn
             input_fn.sig.ident = input_fn_ident.clone();
 
-            let error_handling = match respond_with_errors {
-                true => {
-                    quote! {
-                        ::worker::Response::error(e.to_string(), 500).unwrap().into()
+            let error_handling = if respond_with_errors {
+                quote! { ::worker::Response::error(e.to_string(), 500).unwrap().into() }
+            } else {
+                quote! { ::worker::Response::error("INTERNAL SERVER ERROR", 500).unwrap().into() }
+            };
+
+            let fetch_invoke = if http {
+                quote! (
+                    match ::worker::request_from_wasm(req) {
+                        Ok(request) => match #input_fn_ident(request, env, ctx).await.map(::worker::response_to_wasm) {
+                            Ok(Ok(response)) => Ok(response),
+                            Ok(Err(e)) => Err(e),
+                            Err(e) => Err(e)
+                        },
+                        Err(e) => Err(e)
                     }
-                }
-                false => {
-                    quote! { panic!("{}", e) }
-                }
+                )
+            } else {
+                quote!(#input_fn_ident(req.into(), env, ctx).await.map(::worker::worker_sys::web_sys::Response::from))
             };
 
             // create a new "main" function that takes the worker_sys::Request, and calls the
@@ -70,11 +80,12 @@ pub fn expand_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
                     ctx: ::worker::worker_sys::Context
                 ) -> ::worker::worker_sys::web_sys::Response {
                     let ctx = worker::Context::new(ctx);
+                    let result = #fetch_invoke;
                     // get the worker::Result<worker::Response> by calling the original fn
-                    match #input_fn_ident(::worker::Request::from(req), env, ctx).await.map(::worker::worker_sys::web_sys::Response::from) {
+                    match result {
                         Ok(res) => res,
                         Err(e) => {
-                            ::worker::console_log!("{}", &e);
+                            ::worker::console_error!("{}", &e);
                             #error_handling
                         }
                     }
@@ -143,7 +154,7 @@ pub fn expand_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
                 pub async fn #wrapper_fn_ident(event: ::worker::worker_sys::MessageBatch, env: ::worker::Env, ctx: ::worker::worker_sys::Context) {
                     // call the original fn
                     let ctx = worker::Context::new(ctx);
-                    match #input_fn_ident(::worker::MessageBatch::new(event), env, ctx).await {
+                    match #input_fn_ident(::worker::MessageBatch::from(event), env, ctx).await {
                         Ok(()) => {},
                         Err(e) => {
                             ::worker::console_log!("{}", &e);
