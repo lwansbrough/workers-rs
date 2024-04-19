@@ -1,3 +1,5 @@
+#[cfg(feature = "d1")]
+use crate::d1::D1Database;
 use crate::error::Error;
 #[cfg(feature = "queue")]
 use crate::Queue;
@@ -10,11 +12,17 @@ use worker_kv::KvStore;
 #[wasm_bindgen]
 extern "C" {
     /// Env contains any bindings you have associated with the Worker when you uploaded it.
+    #[derive(Clone)]
     pub type Env;
 }
 
+unsafe impl Send for Env {}
+unsafe impl Sync for Env {}
+
 impl Env {
-    fn get_binding<T: EnvBinding>(&self, name: &str) -> Result<T> {
+    /// Access a binding that does not have a wrapper in workers-rs. Useful for internal-only or
+    /// unstable bindings.
+    pub fn get_binding<T: EnvBinding>(&self, name: &str) -> Result<T> {
         let binding = js_sys::Reflect::get(self, &JsValue::from(name))
             .map_err(|_| Error::JsError(format!("Env does not contain binding `{name}`")))?;
         if binding.is_undefined() {
@@ -67,6 +75,12 @@ impl Env {
 
     /// Access an R2 Bucket by the binding name configured in your wrangler.toml file.
     pub fn bucket(&self, binding: &str) -> Result<Bucket> {
+        self.get_binding(binding)
+    }
+
+    /// Access a D1 Database by the binding name configured in your wrangler.toml file.
+    #[cfg(feature = "d1")]
+    pub fn d1(&self, binding: &str) -> Result<D1Database> {
         self.get_binding(binding)
     }
 }
@@ -134,6 +148,7 @@ impl ToString for StringBinding {
 }
 
 /// A string value representing a binding to a secret in a Worker.
-pub type Secret = StringBinding;
+#[doc(inline)]
+pub use StringBinding as Secret;
 /// A string value representing a binding to an environment variable in a Worker.
 pub type Var = StringBinding;
