@@ -347,7 +347,7 @@ pub struct MultipartUpload {
 impl MultipartUpload {
     /// The key for the multipart upload.
     pub fn key(&self) -> String {
-        self.inner.key()
+        self.inner.key().unwrap()
     }
 
     /// Uploads a single part with the specified part number to this multipart upload.
